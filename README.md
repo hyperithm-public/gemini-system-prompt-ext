@@ -2,17 +2,6 @@
 
 Google Gemini에 나만의 지침을 추가하는 Chrome 확장 프로그램입니다.
 
-<table>
-  <tr>
-    <td><img src="screenshots/menu.png" width="400" alt="Gemini 설정 메뉴"/></td>
-    <td><img src="screenshots/modal.png" width="400" alt="지침 관리 화면"/></td>
-  </tr>
-  <tr>
-    <td align="center"><i>설정 메뉴에서 "Gemini 지침" 선택</i></td>
-    <td align="center"><i>지침 추가/관리 화면</i></td>
-  </tr>
-</table>
-
 ## 이런 분들께 추천해요
 
 - Gemini에게 매번 같은 말 반복하기 귀찮으신 분
@@ -49,7 +38,12 @@ Google Gemini에 나만의 지침을 추가하는 Chrome 확장 프로그램입�
 1. [gemini.google.com](https://gemini.google.com) 접속
 2. 우측 상단 설정 메뉴 클릭
 3. **Gemini 지침** 메뉴 선택
+
+<img src="screenshots/menu.png" width="500" alt="설정 메뉴에서 Gemini 지침 선택"/>
+
 4. 원하는 지침 추가
+
+<img src="screenshots/modal.png" width="500" alt="지침 추가/관리 화면"/>
 
 ### 지침 예시
 
