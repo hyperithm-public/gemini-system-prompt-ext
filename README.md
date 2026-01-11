@@ -28,26 +28,21 @@ Google Gemini에 나만의 지침을 추가하는 Chrome 확장 프로그램입�
 
 ## 설치 방법
 
-### 1단계: 다운로드
+### 1단계: 다운로드 및 압축 해제
 
 [**📥 최신 버전 다운로드**](https://github.com/hyperithm-public/gemini-system-prompt-ext/releases/latest)
 
 위 링크에서 `extension.zip` 파일을 다운로드하고 압축을 풉니다.
 
-### 2단계: Chrome 확장 프로그램 페이지 열기
+### 2단계: Chrome 확장 프로그램 설치
 
-Chrome 주소창에 입력:
-```
-chrome://extensions
-```
+1. Chrome 주소창에 `chrome://extensions` 입력
+2. 우측 상단의 **개발자 모드** 켜기
+3. **압축해제된 확장 프로그램을 로드합니다** 클릭
+4. 압축 해제한 폴더 선택
 
-우측 상단의 **개발자 모드**를 켭니다.
-
-### 3단계: 확장 프로그램 설치
-
-1. **압축해제된 확장 프로그램을 로드합니다** 클릭
-2. 압축 해제한 폴더 선택
-3. 완료!
+<img src="screenshots/install.png" width="600" alt="Chrome 확장 프로그램 설치 화면"/>
+<br><i>개발자 모드를 켜고 "압축해제된 확장 프로그램을 로드합니다" 클릭</i>
 
 ## 사용 방법
 
