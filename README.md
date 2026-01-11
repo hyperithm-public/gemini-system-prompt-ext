@@ -30,7 +30,9 @@ Google Gemini에 나만의 지침을 추가하는 Chrome 확장 프로그램입�
 
 ### 1단계: 다운로드
 
-**[Code] → [Download ZIP]** 버튼을 클릭해서 다운로드 후 압축을 풉니다.
+[**📥 최신 버전 다운로드**](https://github.com/hyperithm-public/gemini-system-prompt-ext/releases/latest)
+
+위 링크에서 `extension.zip` 파일을 다운로드하고 압축을 풉니다.
 
 ### 2단계: Chrome 확장 프로그램 페이지 열기
 
@@ -44,7 +46,7 @@ chrome://extensions
 ### 3단계: 확장 프로그램 설치
 
 1. **압축해제된 확장 프로그램을 로드합니다** 클릭
-2. 다운로드한 폴더 안의 `extension` 폴더 선택
+2. 압축 해제한 폴더 선택
 3. 완료!
 
 ## 사용 방법
