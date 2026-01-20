@@ -26,6 +26,10 @@
    */
   function shouldInject() {
     const url = window.location.href;
+
+    // Gems 기능 제외 (자체 시스템 지침 있음)
+    if (url.includes('/gem/')) return false;
+
     // 새 대화 페이지
     if (url.endsWith('/app') || url.endsWith('/app/')) return true;
 
