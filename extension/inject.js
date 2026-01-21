@@ -102,6 +102,34 @@
     }
   }
 
+  /**
+   * Classify error into safe error codes (prevent leaking implementation details)
+   */
+  function classifyError(error) {
+    if (!error) return 'unknown_error';
+
+    const message = error.message || String(error);
+
+    // JSON parsing errors
+    if (message.includes('JSON') || message.includes('Unexpected token') ||
+        message.includes('parsing')) {
+      return 'json_parse_error';
+    }
+
+    // Type/structure errors
+    if (message.includes('undefined') || message.includes('null') ||
+        message.includes('Cannot read') || message.includes('is not')) {
+      return 'api_format_changed';
+    }
+
+    // Network/encoding errors
+    if (message.includes('URLSearchParams') || message.includes('encoding')) {
+      return 'request_encoding_error';
+    }
+
+    return 'injection_error';
+  }
+
   // ============================================
   // XHR Interception
   // ============================================
@@ -172,7 +200,7 @@
         } catch (e) {
           logError('XHR injection error:', e);
           window.dispatchEvent(new CustomEvent('gsp-injection-failed', {
-            detail: { error: e.message }
+            detail: { error: classifyError(e) }
           }));
         }
       }

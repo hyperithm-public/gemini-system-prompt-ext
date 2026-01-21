@@ -52,6 +52,9 @@
       exampleClose: 'Close',
       injectionError: 'Injection failed',
       apiFormatChanged: 'Gemini API format may have changed. Extension update needed.',
+      jsonParseError: 'Failed to parse request data.',
+      requestEncodingError: 'Failed to encode request.',
+      injectionErrorGeneric: 'Failed to inject instructions.',
       instructionTooLong: 'Instruction too long (max 20000 characters)',
       tooManyInstructions: 'Too many instructions (max 20)',
       unknownError: 'An unexpected error occurred',
@@ -74,6 +77,9 @@
       exampleClose: '닫기',
       injectionError: '주입 실패',
       apiFormatChanged: 'Gemini API 형식이 변경되었을 수 있습니다. 확장 프로그램 업데이트가 필요합니다.',
+      jsonParseError: '요청 데이터 파싱에 실패했습니다.',
+      requestEncodingError: '요청 인코딩에 실패했습니다.',
+      injectionErrorGeneric: '지침 주입에 실패했습니다.',
       instructionTooLong: '지침이 너무 깁니다 (최대 20000자)',
       tooManyInstructions: '지침이 너무 많습니다 (최대 20개)',
       unknownError: '예기치 않은 오류가 발생했습니다',
@@ -222,12 +228,6 @@
   // ============================================
 
   let currentSettings = { enabled: true, instructions: [] };
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 
   /**
    * Create settings page structure using DOM APIs (XSS-safe)
@@ -627,7 +627,11 @@
   function sanitizeErrorMessage(errorCode) {
     // Only show translated messages for known error types
     const knownErrors = {
-      'api_format_changed': 'apiFormatChanged'
+      'api_format_changed': 'apiFormatChanged',
+      'json_parse_error': 'jsonParseError',
+      'request_encoding_error': 'requestEncodingError',
+      'injection_error': 'injectionErrorGeneric',
+      'unknown_error': 'unknownError'
     };
 
     if (knownErrors[errorCode]) {
