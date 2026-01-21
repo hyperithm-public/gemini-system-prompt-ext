@@ -21,9 +21,20 @@
   };
 
   const LIMITS = {
-    maxInstructionLength: 5000,
+    maxInstructionLength: 20000,
     maxInstructionsCount: 20
   };
+
+  // Debug mode - set to true for development logging
+  const DEBUG = false;
+
+  function log(...args) {
+    if (DEBUG) console.log('[GSP]', ...args);
+  }
+
+  function logError(...args) {
+    if (DEBUG) console.error('[GSP]', ...args);
+  }
 
   // ============================================
   // Translations
@@ -41,8 +52,9 @@
       exampleClose: 'Close',
       injectionError: 'Injection failed',
       apiFormatChanged: 'Gemini API format may have changed. Extension update needed.',
-      instructionTooLong: 'Instruction too long (max 5000 characters)',
+      instructionTooLong: 'Instruction too long (max 20000 characters)',
       tooManyInstructions: 'Too many instructions (max 20)',
+      unknownError: 'An unexpected error occurred',
       examples: [
         'Always respond in a friendly, conversational tone',
         'I prefer concise answers without unnecessary explanations',
@@ -62,8 +74,9 @@
       exampleClose: '닫기',
       injectionError: '주입 실패',
       apiFormatChanged: 'Gemini API 형식이 변경되었을 수 있습니다. 확장 프로그램 업데이트가 필요합니다.',
-      instructionTooLong: '지침이 너무 깁니다 (최대 5000자)',
+      instructionTooLong: '지침이 너무 깁니다 (최대 20000자)',
       tooManyInstructions: '지침이 너무 많습니다 (최대 20개)',
+      unknownError: '예기치 않은 오류가 발생했습니다',
       examples: [
         '항상 친근하고 대화하는 톤으로 응답해주세요',
         '불필요한 설명 없이 간결한 답변을 선호합니다',
@@ -116,11 +129,11 @@
     script.src = chrome.runtime.getURL('inject.js');
     script.onload = function() {
       this.remove();
-      console.log('[GSP] Page script injected');
+      log('Page script injected');
     };
     script.onerror = function() {
       this.remove();
-      console.error('[GSP] Failed to inject page script - CSP may be blocking');
+      logError('Failed to inject page script - CSP may be blocking');
       showErrorToast(getLanguage() === 'ko'
         ? '스크립트 로드 실패 - 페이지를 새로고침해 주세요'
         : 'Script load failed - please refresh the page');
@@ -132,7 +145,7 @@
     const settings = await getSettingsSync();
     document.documentElement.dataset.gspSettings = JSON.stringify(settings);
     document.documentElement.dataset.gspReady = 'true';
-    console.log('[GSP] Settings synced:', { enabled: settings.enabled, count: settings.instructions.length });
+    log('Settings synced:', { enabled: settings.enabled, count: settings.instructions.length });
   }
 
   // ============================================
@@ -145,7 +158,7 @@
       const menuContent = menu?.querySelector(SELECTORS.settingsMenuContent);
 
       if (menuContent && !menuContent.querySelector('#gsp-menu-item')) {
-        console.log('[GSP] Injecting menu item...');
+        log('Injecting menu item...');
 
         const menuItem = document.createElement('button');
         menuItem.id = 'gsp-menu-item';
@@ -187,7 +200,7 @@
         });
 
         menuContent.appendChild(menuItem);
-        console.log('[GSP] Menu item injected');
+        log('Menu item injected');
       }
     });
 
@@ -216,6 +229,93 @@
     return div.innerHTML;
   }
 
+  /**
+   * Create settings page structure using DOM APIs (XSS-safe)
+   */
+  function createSettingsPageContent(enabled) {
+    const page = document.createElement('div');
+    page.className = 'gsp-page';
+
+    // Back button
+    const backBtn = document.createElement('button');
+    backBtn.className = 'gsp-back-btn';
+    backBtn.id = 'gsp-back';
+    const backIcon = document.createElement('span');
+    backIcon.className = 'google-symbols';
+    backIcon.textContent = 'arrow_back';
+    backBtn.appendChild(backIcon);
+
+    // Page content container
+    const pageContent = document.createElement('div');
+    pageContent.className = 'gsp-page-content';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'gsp-page-header';
+
+    const title = document.createElement('h1');
+    title.className = 'gsp-page-title';
+    title.textContent = t('title');
+
+    const switchLabel = document.createElement('label');
+    switchLabel.className = 'gsp-switch';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = 'gsp-enabled';
+    checkbox.checked = enabled;
+
+    const slider = document.createElement('span');
+    slider.className = 'gsp-slider';
+
+    switchLabel.appendChild(checkbox);
+    switchLabel.appendChild(slider);
+    header.appendChild(title);
+    header.appendChild(switchLabel);
+
+    // Description
+    const description = document.createElement('p');
+    description.className = 'gsp-page-description';
+    description.textContent = t('description');
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'gsp-actions';
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'gsp-action-btn gsp-add-btn';
+    addBtn.id = 'gsp-add';
+    const addIcon = document.createElement('span');
+    addIcon.className = 'google-symbols';
+    addIcon.textContent = 'add';
+    addBtn.appendChild(addIcon);
+    addBtn.appendChild(document.createTextNode(t('addBtn')));
+
+    const examplesBtn = document.createElement('button');
+    examplesBtn.className = 'gsp-action-btn gsp-examples-btn';
+    examplesBtn.id = 'gsp-examples';
+    examplesBtn.textContent = t('showExamples');
+
+    actions.appendChild(addBtn);
+    actions.appendChild(examplesBtn);
+
+    // Instructions list container
+    const instructionsList = document.createElement('div');
+    instructionsList.className = 'gsp-instructions-list';
+    instructionsList.id = 'gsp-instructions-list';
+
+    // Assemble page content
+    pageContent.appendChild(header);
+    pageContent.appendChild(description);
+    pageContent.appendChild(actions);
+    pageContent.appendChild(instructionsList);
+
+    page.appendChild(backBtn);
+    page.appendChild(pageContent);
+
+    return page;
+  }
+
   async function openSettingsPage() {
     if (document.getElementById('gsp-page')) return;
 
@@ -225,34 +325,7 @@
     overlay.id = 'gsp-page';
     overlay.className = 'gsp-page-overlay';
 
-    const page = document.createElement('div');
-    page.className = 'gsp-page';
-
-    page.innerHTML = `
-      <button class="gsp-back-btn" id="gsp-back">
-        <span class="google-symbols">arrow_back</span>
-      </button>
-      <div class="gsp-page-content">
-        <div class="gsp-page-header">
-          <h1 class="gsp-page-title">${t('title')}</h1>
-          <label class="gsp-switch">
-            <input type="checkbox" id="gsp-enabled" ${currentSettings.enabled ? 'checked' : ''}>
-            <span class="gsp-slider"></span>
-          </label>
-        </div>
-        <p class="gsp-page-description">${t('description')}</p>
-        <div class="gsp-actions">
-          <button class="gsp-action-btn gsp-add-btn" id="gsp-add">
-            <span class="google-symbols">add</span>
-            ${t('addBtn')}
-          </button>
-          <button class="gsp-action-btn gsp-examples-btn" id="gsp-examples">
-            ${t('showExamples')}
-          </button>
-        </div>
-        <div class="gsp-instructions-list" id="gsp-instructions-list"></div>
-      </div>
-    `;
+    const page = createSettingsPageContent(currentSettings.enabled);
 
     overlay.appendChild(page);
     document.body.appendChild(overlay);
@@ -345,6 +418,41 @@
     }
   }
 
+  /**
+   * Create add dialog structure using DOM APIs (XSS-safe)
+   */
+  function createAddDialogContent() {
+    const dialogBox = document.createElement('div');
+    dialogBox.className = 'gsp-dialog';
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'gsp-dialog-input';
+    textarea.id = 'gsp-new-instruction';
+    textarea.placeholder = t('placeholder');
+    textarea.rows = 4;
+
+    const actions = document.createElement('div');
+    actions.className = 'gsp-dialog-actions';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'gsp-dialog-btn gsp-dialog-cancel';
+    cancelBtn.id = 'gsp-dialog-cancel';
+    cancelBtn.textContent = getLanguage() === 'ko' ? '취소' : 'Cancel';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'gsp-dialog-btn gsp-dialog-save';
+    saveBtn.id = 'gsp-dialog-save';
+    saveBtn.textContent = t('addBtn');
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+
+    dialogBox.appendChild(textarea);
+    dialogBox.appendChild(actions);
+
+    return dialogBox;
+  }
+
   function showAddDialog() {
     if (document.getElementById('gsp-dialog')) return;
 
@@ -352,15 +460,7 @@
     dialog.id = 'gsp-dialog';
     dialog.className = 'gsp-dialog-overlay';
 
-    dialog.innerHTML = `
-      <div class="gsp-dialog">
-        <textarea class="gsp-dialog-input" id="gsp-new-instruction" placeholder="${t('placeholder')}" rows="4"></textarea>
-        <div class="gsp-dialog-actions">
-          <button class="gsp-dialog-btn gsp-dialog-cancel" id="gsp-dialog-cancel">${getLanguage() === 'ko' ? '취소' : 'Cancel'}</button>
-          <button class="gsp-dialog-btn gsp-dialog-save" id="gsp-dialog-save">${t('addBtn')}</button>
-        </div>
-      </div>
-    `;
+    dialog.appendChild(createAddDialogContent());
 
     document.body.appendChild(dialog);
 
@@ -414,6 +514,53 @@
     });
   }
 
+  /**
+   * Create examples dialog structure using DOM APIs (XSS-safe)
+   */
+  function createExamplesDialogContent(examples) {
+    const dialogBox = document.createElement('div');
+    dialogBox.className = 'gsp-dialog gsp-examples-dialog';
+
+    const title = document.createElement('h3');
+    title.className = 'gsp-dialog-title';
+    title.textContent = t('exampleTitle');
+
+    const examplesList = document.createElement('div');
+    examplesList.className = 'gsp-examples-list';
+
+    examples.forEach(ex => {
+      const btn = document.createElement('button');
+      btn.className = 'gsp-example-item';
+
+      const textSpan = document.createElement('span');
+      textSpan.textContent = ex;
+
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'google-symbols';
+      iconSpan.textContent = 'add';
+
+      btn.appendChild(textSpan);
+      btn.appendChild(iconSpan);
+      examplesList.appendChild(btn);
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'gsp-dialog-actions';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'gsp-dialog-btn gsp-dialog-close';
+    closeBtn.id = 'gsp-dialog-close';
+    closeBtn.textContent = t('exampleClose');
+
+    actions.appendChild(closeBtn);
+
+    dialogBox.appendChild(title);
+    dialogBox.appendChild(examplesList);
+    dialogBox.appendChild(actions);
+
+    return dialogBox;
+  }
+
   function showExamplesDialog() {
     if (document.getElementById('gsp-dialog')) return;
 
@@ -422,22 +569,7 @@
     dialog.id = 'gsp-dialog';
     dialog.className = 'gsp-dialog-overlay';
 
-    dialog.innerHTML = `
-      <div class="gsp-dialog gsp-examples-dialog">
-        <h3 class="gsp-dialog-title">${t('exampleTitle')}</h3>
-        <div class="gsp-examples-list">
-          ${examples.map(ex => `
-            <button class="gsp-example-item">
-              <span>${escapeHtml(ex)}</span>
-              <span class="google-symbols">add</span>
-            </button>
-          `).join('')}
-        </div>
-        <div class="gsp-dialog-actions">
-          <button class="gsp-dialog-btn gsp-dialog-close" id="gsp-dialog-close">${t('exampleClose')}</button>
-        </div>
-      </div>
-    `;
+    dialog.appendChild(createExamplesDialogContent(examples));
 
     document.body.appendChild(dialog);
 
@@ -489,6 +621,22 @@
   // Error Toast Notification
   // ============================================
 
+  /**
+   * Sanitize error messages to prevent leaking implementation details
+   */
+  function sanitizeErrorMessage(errorCode) {
+    // Only show translated messages for known error types
+    const knownErrors = {
+      'api_format_changed': 'apiFormatChanged'
+    };
+
+    if (knownErrors[errorCode]) {
+      return t(knownErrors[errorCode]);
+    }
+    // Generic fallback for unknown errors - don't expose raw error messages
+    return t('unknownError');
+  }
+
   function showErrorToast(message) {
     const existingToast = document.getElementById('gsp-error-toast');
     if (existingToast) existingToast.remove();
@@ -508,12 +656,8 @@
 
   function listenForInjectionErrors() {
     window.addEventListener('gsp-injection-failed', (e) => {
-      const error = e.detail?.error;
-      if (error === 'api_format_changed') {
-        showErrorToast(t('apiFormatChanged'));
-      } else {
-        showErrorToast(error || 'Unknown error');
-      }
+      const errorCode = e.detail?.error;
+      showErrorToast(sanitizeErrorMessage(errorCode));
     });
   }
 
@@ -522,7 +666,7 @@
   // ============================================
 
   async function init() {
-    console.log('[GSP] Content script initializing...');
+    log('Content script initializing...');
 
     await syncSettingsToPage();
     injectPageScript();
@@ -533,7 +677,7 @@
       await syncSettingsToPage();
     });
 
-    console.log('[GSP] Content script initialized');
+    log('Content script initialized');
   }
 
   init();

@@ -11,6 +11,17 @@
   const DEFAULT_INSTRUCTIONS = [];
   const MAX_TRACKED_CONVERSATIONS = 100;
 
+  // Debug mode - set to true for development logging
+  const DEBUG = false;
+
+  function log(...args) {
+    if (DEBUG) console.log('[GSP]', ...args);
+  }
+
+  function logError(...args) {
+    if (DEBUG) console.error('[GSP]', ...args);
+  }
+
   // 주입된 대화 추적
   const injectedConversations = new Set();
 
@@ -72,7 +83,7 @@
         return JSON.parse(settingsAttr);
       }
     } catch (e) {
-      console.error('[GSP] Settings parse error:', e);
+      logError('Settings parse error:', e);
     }
     return { enabled: true, instructions: DEFAULT_INSTRUCTIONS };
   }
@@ -114,7 +125,7 @@
 
       // Skip if settings not ready yet (race condition protection)
       if (!settings) {
-        console.log('[GSP] Settings not ready, skipping injection');
+        log('Settings not ready, skipping injection');
         return _call.call(originalSend, this, body);
       }
 
@@ -131,7 +142,7 @@
 
             // Validate API structure before attempting modification
             if (!validateApiStructure(parsed)) {
-              console.error('[GSP] API structure validation failed - format may have changed');
+              logError('API structure validation failed - format may have changed');
               window.dispatchEvent(new CustomEvent('gsp-injection-failed', {
                 detail: { error: 'api_format_changed' }
               }));
@@ -156,10 +167,10 @@
 
             // Mark as injected
             markInjected();
-            console.log('[GSP] Instructions injected:', instructions.length);
+            log('Instructions injected:', instructions.length);
           }
         } catch (e) {
-          console.error('[GSP] XHR injection error:', e);
+          logError('XHR injection error:', e);
           window.dispatchEvent(new CustomEvent('gsp-injection-failed', {
             detail: { error: e.message }
           }));
@@ -183,5 +194,5 @@
     configurable: false
   });
 
-  console.log('[GSP] Page context injector loaded');
+  log('Page context injector loaded');
 })();
