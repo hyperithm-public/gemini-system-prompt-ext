@@ -116,9 +116,16 @@
     script.src = chrome.runtime.getURL('inject.js');
     script.onload = function() {
       this.remove();
+      console.log('[GSP] Page script injected');
+    };
+    script.onerror = function() {
+      this.remove();
+      console.error('[GSP] Failed to inject page script - CSP may be blocking');
+      showErrorToast(getLanguage() === 'ko'
+        ? '스크립트 로드 실패 - 페이지를 새로고침해 주세요'
+        : 'Script load failed - please refresh the page');
     };
     (document.head || document.documentElement).appendChild(script);
-    console.log('[GSP] Page script injected');
   }
 
   async function syncSettingsToPage() {
@@ -243,14 +250,16 @@
             ${t('showExamples')}
           </button>
         </div>
-        <div class="gsp-instructions-list" id="gsp-instructions-list">
-          ${renderInstructionsList()}
-        </div>
+        <div class="gsp-instructions-list" id="gsp-instructions-list"></div>
       </div>
     `;
 
     overlay.appendChild(page);
     document.body.appendChild(overlay);
+
+    // Populate instructions list using DOM manipulation
+    const instructionsList = document.getElementById('gsp-instructions-list');
+    instructionsList.appendChild(createInstructionElements());
 
     // Event listeners
     document.getElementById('gsp-back').addEventListener('click', closeSettingsPage);
@@ -268,19 +277,41 @@
     attachDeleteListeners();
   }
 
-  function renderInstructionsList() {
+  function createInstructionElements() {
+    const fragment = document.createDocumentFragment();
+
     if (currentSettings.instructions.length === 0) {
-      return `<div class="gsp-empty-state">${t('emptyState')}</div>`;
+      const emptyState = document.createElement('div');
+      emptyState.className = 'gsp-empty-state';
+      emptyState.textContent = t('emptyState');
+      fragment.appendChild(emptyState);
+      return fragment;
     }
 
-    return currentSettings.instructions.map((instruction, index) => `
-      <div class="gsp-instruction-item" data-index="${index}">
-        <span class="gsp-instruction-text">${escapeHtml(instruction)}</span>
-        <button class="gsp-delete-btn" data-index="${index}">
-          <span class="google-symbols">delete</span>
-        </button>
-      </div>
-    `).join('');
+    currentSettings.instructions.forEach((instruction, index) => {
+      const item = document.createElement('div');
+      item.className = 'gsp-instruction-item';
+      item.dataset.index = index;
+
+      const text = document.createElement('span');
+      text.className = 'gsp-instruction-text';
+      text.textContent = instruction;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'gsp-delete-btn';
+      deleteBtn.dataset.index = index;
+
+      const deleteIcon = document.createElement('span');
+      deleteIcon.className = 'google-symbols';
+      deleteIcon.textContent = 'delete';
+      deleteBtn.appendChild(deleteIcon);
+
+      item.appendChild(text);
+      item.appendChild(deleteBtn);
+      fragment.appendChild(item);
+    });
+
+    return fragment;
   }
 
   function attachDeleteListeners() {
@@ -305,7 +336,11 @@
 
     const list = document.getElementById('gsp-instructions-list');
     if (list) {
-      list.innerHTML = renderInstructionsList();
+      // Clear existing content using DOM manipulation
+      while (list.firstChild) {
+        list.removeChild(list.firstChild);
+      }
+      list.appendChild(createInstructionElements());
       attachDeleteListeners();
     }
   }

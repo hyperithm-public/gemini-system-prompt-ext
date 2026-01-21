@@ -98,12 +98,16 @@
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
 
-  XMLHttpRequest.prototype.open = function(method, url, ...args) {
-    this._gspUrl = url;
-    return originalOpen.apply(this, [method, url, ...args]);
-  };
+  // Store references to prevent tampering
+  const _apply = Function.prototype.apply;
+  const _call = Function.prototype.call;
 
-  XMLHttpRequest.prototype.send = function(body) {
+  function patchedOpen(method, url, ...args) {
+    this._gspUrl = url;
+    return _apply.call(originalOpen, this, [method, url, ...args]);
+  }
+
+  function patchedSend(body) {
     // StreamGenerate 요청만 인터셉트
     if (this._gspUrl?.includes('StreamGenerate') && body && typeof body === 'string') {
       const settings = getSettings();
@@ -111,7 +115,7 @@
       // Skip if settings not ready yet (race condition protection)
       if (!settings) {
         console.log('[GSP] Settings not ready, skipping injection');
-        return originalSend.call(this, body);
+        return _call.call(originalSend, this, body);
       }
 
       // Check injection conditions
@@ -131,7 +135,7 @@
               window.dispatchEvent(new CustomEvent('gsp-injection-failed', {
                 detail: { error: 'api_format_changed' }
               }));
-              return originalSend.call(this, body);
+              return _call.call(originalSend, this, body);
             }
 
             // Parse double JSON structure
@@ -163,8 +167,21 @@
       }
     }
 
-    return originalSend.call(this, body);
-  };
+    return _call.call(originalSend, this, body);
+  }
+
+  // Apply patches with tamper protection
+  Object.defineProperty(XMLHttpRequest.prototype, 'open', {
+    value: patchedOpen,
+    writable: false,
+    configurable: false
+  });
+
+  Object.defineProperty(XMLHttpRequest.prototype, 'send', {
+    value: patchedSend,
+    writable: false,
+    configurable: false
+  });
 
   console.log('[GSP] Page context injector loaded');
 })();
