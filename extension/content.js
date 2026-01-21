@@ -20,6 +20,11 @@
     instructions: 'gsp_instructions'
   };
 
+  const LIMITS = {
+    maxInstructionLength: 5000,
+    maxInstructionsCount: 20
+  };
+
   // ============================================
   // Translations
   // ============================================
@@ -35,6 +40,9 @@
       exampleTitle: 'Example Instructions',
       exampleClose: 'Close',
       injectionError: 'Injection failed',
+      apiFormatChanged: 'Gemini API format may have changed. Extension update needed.',
+      instructionTooLong: 'Instruction too long (max 5000 characters)',
+      tooManyInstructions: 'Too many instructions (max 20)',
       examples: [
         'Always respond in a friendly, conversational tone',
         'I prefer concise answers without unnecessary explanations',
@@ -53,6 +61,9 @@
       exampleTitle: '예시 지침',
       exampleClose: '닫기',
       injectionError: '주입 실패',
+      apiFormatChanged: 'Gemini API 형식이 변경되었을 수 있습니다. 확장 프로그램 업데이트가 필요합니다.',
+      instructionTooLong: '지침이 너무 깁니다 (최대 5000자)',
+      tooManyInstructions: '지침이 너무 많습니다 (최대 20개)',
       examples: [
         '항상 친근하고 대화하는 톤으로 응답해주세요',
         '불필요한 설명 없이 간결한 답변을 선호합니다',
@@ -113,6 +124,7 @@
   async function syncSettingsToPage() {
     const settings = await getSettingsSync();
     document.documentElement.dataset.gspSettings = JSON.stringify(settings);
+    document.documentElement.dataset.gspReady = 'true';
     console.log('[GSP] Settings synced:', { enabled: settings.enabled, count: settings.instructions.length });
   }
 
@@ -324,6 +336,16 @@
     document.getElementById('gsp-dialog-save').addEventListener('click', async () => {
       const value = input.value.trim();
       if (value) {
+        // Validate input length
+        if (value.length > LIMITS.maxInstructionLength) {
+          showErrorToast(t('instructionTooLong'));
+          return;
+        }
+        // Validate instruction count
+        if (currentSettings.instructions.length >= LIMITS.maxInstructionsCount) {
+          showErrorToast(t('tooManyInstructions'));
+          return;
+        }
         currentSettings.instructions.push(value);
         await saveAndRefresh();
       }
@@ -339,6 +361,16 @@
         e.preventDefault();
         const value = input.value.trim();
         if (value) {
+          // Validate input length
+          if (value.length > LIMITS.maxInstructionLength) {
+            showErrorToast(t('instructionTooLong'));
+            return;
+          }
+          // Validate instruction count
+          if (currentSettings.instructions.length >= LIMITS.maxInstructionsCount) {
+            showErrorToast(t('tooManyInstructions'));
+            return;
+          }
           currentSettings.instructions.push(value);
           await saveAndRefresh();
         }
@@ -378,6 +410,11 @@
 
     dialog.querySelectorAll('.gsp-example-item').forEach((item, index) => {
       item.addEventListener('click', async () => {
+        // Validate instruction count
+        if (currentSettings.instructions.length >= LIMITS.maxInstructionsCount) {
+          showErrorToast(t('tooManyInstructions'));
+          return;
+        }
         currentSettings.instructions.push(examples[index]);
         await saveAndRefresh();
         closeDialog();
@@ -436,7 +473,12 @@
 
   function listenForInjectionErrors() {
     window.addEventListener('gsp-injection-failed', (e) => {
-      showErrorToast(e.detail?.error || 'Unknown error');
+      const error = e.detail?.error;
+      if (error === 'api_format_changed') {
+        showErrorToast(t('apiFormatChanged'));
+      } else {
+        showErrorToast(error || 'Unknown error');
+      }
     });
   }
 

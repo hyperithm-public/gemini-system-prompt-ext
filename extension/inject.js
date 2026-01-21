@@ -9,6 +9,7 @@
   'use strict';
 
   const DEFAULT_INSTRUCTIONS = [];
+  const MAX_TRACKED_CONVERSATIONS = 100;
 
   // 주입된 대화 추적
   const injectedConversations = new Set();
@@ -46,6 +47,11 @@
   function markInjected() {
     const convId = getConversationIdFromUrl();
     if (convId) {
+      // Cleanup oldest entry if at capacity (LRU-style)
+      if (injectedConversations.size >= MAX_TRACKED_CONVERSATIONS) {
+        const oldest = injectedConversations.values().next().value;
+        injectedConversations.delete(oldest);
+      }
       injectedConversations.add(convId);
     }
   }
@@ -54,6 +60,11 @@
    * 설정 가져오기 (content script에서 동기화됨)
    */
   function getSettings() {
+    // Check if settings are ready
+    if (document.documentElement.dataset.gspReady !== 'true') {
+      return null; // Settings not yet synced
+    }
+
     // data attribute에서 설정 읽기
     try {
       const settingsAttr = document.documentElement.dataset.gspSettings;
@@ -64,6 +75,20 @@
       console.error('[GSP] Settings parse error:', e);
     }
     return { enabled: true, instructions: DEFAULT_INSTRUCTIONS };
+  }
+
+  /**
+   * Validate Gemini API request structure
+   */
+  function validateApiStructure(parsed) {
+    if (!parsed || !Array.isArray(parsed)) return false;
+    if (!parsed[1] || typeof parsed[1] !== 'string') return false;
+    try {
+      const inner = JSON.parse(parsed[1]);
+      return inner && Array.isArray(inner[0]) && typeof inner[0][0] === 'string';
+    } catch {
+      return false;
+    }
   }
 
   // ============================================
@@ -83,6 +108,12 @@
     if (this._gspUrl?.includes('StreamGenerate') && body && typeof body === 'string') {
       const settings = getSettings();
 
+      // Skip if settings not ready yet (race condition protection)
+      if (!settings) {
+        console.log('[GSP] Settings not ready, skipping injection');
+        return originalSend.call(this, body);
+      }
+
       // Check injection conditions
       const instructions = settings.instructions || [];
       if (settings.enabled && instructions.length > 0 && shouldInject()) {
@@ -94,31 +125,34 @@
           if (fReq) {
             const parsed = JSON.parse(fReq);
 
-            // Parse double JSON structure
-            if (parsed[1] && typeof parsed[1] === 'string') {
-              const innerArray = JSON.parse(parsed[1]);
-
-              // Modify user prompt
-              if (innerArray[0] && innerArray[0][0]) {
-                const userPrompt = innerArray[0][0];
-
-                // Concatenate all instructions with annotation tag
-                const systemPrompt = instructions.join('\n\n');
-                const annotatedPrompt = `<system_instructions>\n${systemPrompt}\n</system_instructions>`;
-
-                // Prepend annotated system prompt
-                innerArray[0][0] = annotatedPrompt + '\n\n' + userPrompt;
-
-                // Re-encode
-                parsed[1] = JSON.stringify(innerArray);
-                bodyParams.set('f.req', JSON.stringify(parsed));
-                body = bodyParams.toString();
-
-                // Mark as injected
-                markInjected();
-                console.log('[GSP] Instructions injected:', instructions.length);
-              }
+            // Validate API structure before attempting modification
+            if (!validateApiStructure(parsed)) {
+              console.error('[GSP] API structure validation failed - format may have changed');
+              window.dispatchEvent(new CustomEvent('gsp-injection-failed', {
+                detail: { error: 'api_format_changed' }
+              }));
+              return originalSend.call(this, body);
             }
+
+            // Parse double JSON structure
+            const innerArray = JSON.parse(parsed[1]);
+            const userPrompt = innerArray[0][0];
+
+            // Concatenate all instructions with annotation tag
+            const systemPrompt = instructions.join('\n\n');
+            const annotatedPrompt = `<system_instructions>\n${systemPrompt}\n</system_instructions>`;
+
+            // Prepend annotated system prompt
+            innerArray[0][0] = annotatedPrompt + '\n\n' + userPrompt;
+
+            // Re-encode
+            parsed[1] = JSON.stringify(innerArray);
+            bodyParams.set('f.req', JSON.stringify(parsed));
+            body = bodyParams.toString();
+
+            // Mark as injected
+            markInjected();
+            console.log('[GSP] Instructions injected:', instructions.length);
           }
         } catch (e) {
           console.error('[GSP] XHR injection error:', e);
